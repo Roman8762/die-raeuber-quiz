@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Die Räuber – Lernlabyrinth</title>
+  <style>
+    :root{
+      --bg1:#0f2027;
+      --bg2:#203a43;
+      --bg3:#2c5364;
+      --card:#121821dd;
+      --card2:#1d2633;
+      --text:#f3f6fb;
+      --muted:#b8c4d6;
+      --accent:#33d1a0;
+      --accent2:#5bc0ff;
+      --danger:#ff5d73;
+      --warn:#ffcc66;
+      --tile:#2b3442;
+      --tile-border:#475366;
+      --path:#1abc9c;
+      --detour:#ff9f43;
+      --goal:#ffd166;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3));
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+      backdrop-filter: blur(6px);
+      margin-bottom: 18px;
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 860px) {
+      .top-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .maze-title {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      display:inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.92rem;
+      background: #ffffff12;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+    }
+
+    .stats {
+      display:flex;
+      gap:10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .labyrinth {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(70px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 680px) {
+      .labyrinth {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .tile {
+      min-height: 84px;
+      background: var(--tile);
+      border: 2px solid var(--tile-border);
+      border-radius: 14px;
+      position: relative;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding: 8px;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+    }
+
+    .tile.path { border-color: #2fd6a8; }
+    .tile.detour { border-color: #ffb05c; }
+    .tile.goal { border-color: var(--goal); }
+
+    .tile.current {
+      outline: 3px solid #ffffff55;
+      box-shadow: 0 0 0 6px #ffffff10, 0 10px 20px rgba(0,0,0,0.25);
+      transform: translateY(-3px) scale(1.02);
+      animation: pulse 1.2s infinite;
+    }
+
+    .tile.done {
+      background: linear-gradient(180deg, #153a31, #1d4f42);
+      border-color: #48e0b6;
+    }
+
+    .tile.detour-current {
+      background: linear-gradient(180deg, #4d2e14, #6a3c10);
+      border-color: #ffb05c;
+    }
+
+    .tile-icon {
+      font-size: 1.6rem;
+      margin-bottom: 4px;
+    }
+
+    .tile-label {
+      font-size: 0.88rem;
+      line-height: 1.15rem;
+    }
+
+    .legend {
+      display:flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .legend span::before {
+      content:"";
+      display:inline-block;
+      width:12px;
+      height:12px;
+      border-radius: 3px;
+      margin-right:8px;
+      vertical-align:middle;
+    }
+
+    .legend .l-current::before { background:#ffffffaa; }
+    .legend .l-main::before { background:#1abc9c; }
+    .legend .l-detour::before { background:#ff9f43; }
+    .legend .l-goal::before { background:#ffd166; }
+
+    .question-head {
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .question-type {
+      font-weight: bold;
+      color: var(--accent2);
+    }
+
+    .question-box {
+      background: var(--card2);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 18px;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .question-box.shake {
+      animation: shake 0.45s ease;
+    }
+
+    .question {
+      font-size: 1.15rem;
+      margin: 0 0 16px;
+      line-height: 1.5;
+    }
+
+    .answers {
+      display:grid;
+      gap: 10px;
+    }
+
+    button.answer-btn, .control-btn {
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      color: white;
+      background: linear-gradient(180deg, #3a4659, #2e394a);
+      transition: transform 0.15s ease, filter 0.2s ease, background 0.2s ease;
+    }
+
+    button.answer-btn:hover, .control-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    button.answer-btn:active, .control-btn:active {
+      transform: translateY(0);
+    }
+
+    .feedback {
+      margin-top: 16px;
+      min-height: 60px;
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: #ffffff0c;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.05);
+      line-height: 1.5;
+    }
+
+    .feedback.correct {
+      border-color: #2fd6a8;
+      background: #113c31;
+    }
+
+    .feedback.wrong {
+      border-color: #ff7b8d;
+      background: #4a1e27;
+    }
+
+    .feedback.info {
+      border-color: #6ab9ff;
+      background: #172b42;
+    }
+
+    .controls {
+      display:flex;
+      gap:10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .controls .control-btn {
+      width: auto;
+      min-width: 160px;
+      background: linear-gradient(180deg, #1e9f7d, #167860);
+    }
+
+    .finish {
+      text-align:center;
+      padding: 18px;
+      animation: fadeIn 0.5s ease;
+    }
+
+    .finish h2 {
+      margin-top: 0;
+      font-size: 2rem;
+      color: var(--goal);
+    }
+
+    .score-big {
+      font-size: 1.4rem;
+      margin: 10px 0 14px;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.28); }
+      70% { box-shadow: 0 0 0 10px rgba(255,255,255,0.0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-7px); }
+      40% { transform: translateX(7px); }
+      60% { transform: translateX(-5px); }
+      80% { transform: translateX(5px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧭 Die Räuber – Lernlabyrinth</h1>
+    <div class="subtitle">Vorbereitung auf die Maturaprüfung zu Friedrich Schillers <em>Die Räuber</em></div>
+
+    <div class="top-grid">
+      <div class="panel">
+        <div class="maze-title">
+          <strong>Labyrinthkarte</strong>
+          <span class="badge" id="mazeStatus">Hauptweg</span>
+        </div>
+
+        <div class="stats">
+          <span class="badge">Punkte: <strong id="score">0</strong></span>
+          <span class="badge">Hauptfelder: <strong id="mainProgress">0</strong>/8</span>
+          <span class="badge">Umwege gelöst: <strong id="detourCount">0</strong></span>
+        </div>
+
+        <div class="labyrinth" id="labyrinth"></div>
+
+        <div class="legend">
+          <span class="l-current">Deine Position</span>
+          <span class="l-main">Hauptweg</span>
+          <span class="l-detour">Umweg</span>
+          <span class="l-goal">Ziel</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="question-head">
+          <div>
+            <div class="question-type" id="questionType">Hauptfrage</div>
+            <div class="small" id="levelInfo">Level 1</div>
+          </div>
+          <span class="badge" id="stepInfo">Feld 1</span>
+        </div>
+
+        <div class="question-box" id="questionBox">
+          <p class="question" id="questionText">Frage wird geladen…</p>
+          <div class="answers" id="answers"></div>
+          <div class="feedback info" id="feedback">Wähle eine Antwort aus, um durch das Labyrinth zu gehen.</div>
+        </div>
+
+        <div class="controls">
+          <button class="control-btn" id="restartBtn" style="display:none;">Neu starten</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Sound ----------
+    // Kleine WebAudio-Töne, damit keine externen Dateien nötig sind
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playTone(freq, duration, type = "sine", volume = 0.03) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.value = volume;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function playCorrectSound() {
+      playTone(660, 0.12, "triangle", 0.04);
+      setTimeout(() => playTone(880, 0.16, "triangle", 0.04), 100);
+    }
+
+    function playWrongSound() {
+      playTone(240, 0.18, "sawtooth", 0.04);
+      setTimeout(() => playTone(180, 0.22, "sawtooth", 0.035), 90);
+    }
+
+    function playGoalSound() {
+      playTone(523, 0.12, "triangle", 0.04);
+      setTimeout(() => playTone(659, 0.12, "triangle", 0.04), 120);
+      setTimeout(() => playTone(784, 0.2, "triangle", 0.045), 240);
+    }
+
+    // ---------- Fragen ----------
+    const mainQuestions = [
+      {
+        level: "Grundlagen",
+        q: "Warum verstösst der Vater Karl?",
+        a: [
+          "Weil Karl ihn öffentlich beleidigt",
+          "Weil Franz mit einem gefälschten Brief den Vater manipuliert",
+          "Weil Karl sein Erbe freiwillig ablehnt"
+        ],
+        correct: 1,
+        explanation: "Franz fängt Karls Brief ab und ersetzt ihn durch eine erfundene Version, um den Vater gegen Karl aufzubringen."
+      },
+      {
+        level: "Figuren",
+        q: "Welche Rolle nimmt Karl als Räuberhauptmann ursprünglich für sich selbst in Anspruch?",
+        a: [
+          "Er sieht sich als blossen Gesetzlosen ohne moralischen Anspruch",
+          "Er versteht sich als Kämpfer gegen Ungerechtigkeit und will eine gerechtere Ordnung schaffen",
+          "Er will nur Reichtum und Ansehen gewinnen"
+        ],
+        correct: 1,
+        explanation: "Karl glaubt zunächst, seine Gewalt stehe im Dienst einer höheren Gerechtigkeit. Gerade daran scheitert er später."
+      },
+      {
+        level: "Figurenanalyse",
+        q: "Warum kann Franz als extrem rational und zugleich moralisch entgrenzt beschrieben werden?",
+        a: [
+          "Weil er sich von Gefühlen leiten lässt und deshalb unberechenbar handelt",
+          "Weil er alles religiös deutet und dem Schicksal überlässt",
+          "Weil er Vernunft, Nutzen und Macht über Moral, Mitgefühl und familiäre Bindung stellt"
+        ],
+        correct: 2,
+        explanation: "Franz denkt kalt, funktional und eigennützig. Gerade diese entmenschlichte Rationalität macht ihn gefährlich."
+      },
+      {
+        level: "Handlung",
+        q: "Warum zerbricht Karls idealistisches Räuberbild?",
+        a: [
+          "Weil seine Bande in der Praxis grausam wird und die Grenze zwischen Gerechtigkeit und Verbrechen verwischt",
+          "Weil er plötzlich reich wird und das Räuberleben langweilig findet",
+          "Weil Amalia ihn überredet, sofort zurückzukehren"
+        ],
+        correct: 0,
+        explanation: "Karl erkennt, dass seine Bande nicht nur gegen Unterdrückung kämpft, sondern selbst Unschuldige gefährdet und vernichtet."
+      },
+      {
+        level: "Beziehungsnetz",
+        q: "Welche Funktion hat Amalia im Stück am deutlichsten?",
+        a: [
+          "Sie ist eine opportunistische Figur, die sich dem Stärkeren anschliesst",
+          "Sie verkörpert Treue, emotionale Beständigkeit und moralische Klarheit",
+          "Sie ist hauptsächlich komische Entlastungsfigur"
+        ],
+        correct: 1,
+        explanation: "Amalia bleibt Karl treu und widersteht Franz. Dadurch bildet sie einen moralischen Gegenpol zur Intrige."
+      },
+      {
+        level: "Deutung",
+        q: "Was zeigt der Bruderkonflikt zwischen Karl und Franz besonders deutlich?",
+        a: [
+          "Den Gegensatz zwischen Gefühl/Idealismus und kalter Zweckrationalität",
+          "Den Gegensatz zwischen Adel und Bürgertum",
+          "Den Gegensatz zwischen Jugend und Alter"
+        ],
+        correct: 0,
+        explanation: "Karl handelt aus Leidenschaft und Freiheitsdrang, Franz aus Kontrolle, Kalkül und Machtstreben."
+      },
+      {
+        level: "Finale",
+        q: "Warum tötet Karl Amalia am Ende?",
+        a: [
+          "Aus Eifersucht auf Franz",
+          "Weil er in seiner ausweglosen Lage keinen Weg mehr sieht, Liebe und sein gegebenes Räuberversprechen zu vereinen",
+          "Weil Amalia ihn verraten hat"
+        ],
+        correct: 1,
+        explanation: "Die Tat ist Ausdruck völliger Verzweiflung. Karl sieht keinen Platz mehr für ein gemeinsames, friedliches Leben."
+      },
+      {
+        level: "Matura-Level",
+        q: "Welche zentrale Aussage lässt sich aus dem Drama besonders gut ableiten?",
+        a: [
+          "Extreme Haltungen – ob idealistisch oder zynisch – führen zur Zerstörung",
+          "Gesetze sind grundsätzlich immer ungerecht",
+          "Familie ist stärker als jede politische oder moralische Idee"
+        ],
+        correct: 0,
+        explanation: "Sowohl Karls radikaler Freiheitsdrang als auch Franz’ skrupellose Machtlogik enden zerstörerisch."
+      }
+    ];
+
+    const detourQuestions = [
+{
+q: "Wer manipuliert den Vater gezielt gegen Karl?",
+a: ["Franz", "Amalia"],
+correct: 0,
+explanation: "Franz ist der Intrigant."
+},
+{
+q: "Wird Karl freiwillig Räuber?",
+a: ["Ja", "Nein"],
+correct: 0,
+explanation: "Ja."
+},
+{
+q: "Ist Franz kalt-berechnend?",
+a: ["Ja", "Nein"],
+correct: 0,
+explanation: "Ja."
+},
+{
+q: "Bleiben die Räuber friedlich?",
+a: ["Ja", "Nein"],
+correct: 1,
+explanation: "Nein."
+},
+{
+q: "Bleibt Amalia treu?",
+a: ["Ja", "Nein"],
+correct: 0,
+explanation: "Ja."
+},
+{
+q: "Ist Karl emotional?",
+a: ["Ja", "Nein"],
+correct: 0,
+explanation: "Ja."
+},
+{
+q: "Liebt Karl Amalia?",
+a: ["Ja", "Nein"],
+correct: 0,
+explanation: "Ja."
+},
+{
+q: "Scheitern beide Brüder?",
+a: ["Ja", "Nein"],
+correct: 0,
+explanation: "Ja."
+}
+]; 
+
+    // ---------- Labyrinthfelder ----------
+    const tiles = [
+      { type: "start", label: "Start", icon: "🚪" },
+      { type: "main", label: "Feld 1", icon: "1" },
+      { type: "main", label: "Feld 2", icon: "2" },
+      { type: "main", label: "Feld 3", icon: "3" },
+      { type: "detour", label: "Umweg A", icon: "↪" },
+      { type: "main", label: "Feld 4", icon: "4" },
+      { type: "main", label: "Feld 5", icon: "5" },
+      { type: "detour", label: "Umweg B", icon: "↪" },
+      { type: "main", label: "Feld 6", icon: "6" },
+      { type: "main", label: "Feld 7", icon: "7" },
+      { type: "main", label: "Feld 8", icon: "8" },
+      { type: "goal", label: "Ziel", icon: "🏁" }
+    ];
+
+    // ---------- Spielzustand ----------
+    let currentMainIndex = 0;   // 0 bis 7
+    let score = 0;
+    let detourCount = 0;
+    let inDetour = false;
+    let finished = false;
+
+    const labyrinthEl = document.getElementById("labyrinth");
+    const mazeStatusEl = document.getElementById("mazeStatus");
+    const scoreEl = document.getElementById("score");
+    const mainProgressEl = document.getElementById("mainProgress");
+    const detourCountEl = document.getElementById("detourCount");
+    const questionTypeEl = document.getElementById("questionType");
+    const levelInfoEl = document.getElementById("levelInfo");
+    const stepInfoEl = document.getElementById("stepInfo");
+    const questionTextEl = document.getElementById("questionText");
+    const answersEl = document.getElementById("answers");
+    const feedbackEl = document.getElementById("feedback");
+    const questionBoxEl = document.getElementById("questionBox");
+    const restartBtn = document.getElementById("restartBtn");
+
+    function renderLabyrinth() {
+      labyrinthEl.innerHTML = "";
+
+      // Aktuelle "sichtbare" Position auf Karte:
+      // Start = Tile 0
+      // main 0..7 = Tiles 1,2,3,5,6,8,9,10
+      // detours = Tile 4 oder 7 (rein symbolisch)
+      const mainTileMap = [1,2,3,5,6,8,9,10];
+      const currentTile = inDetour
+        ? (currentMainIndex <= 2 ? 4 : 7)
+        : (finished ? 11 : mainTileMap[Math.min(currentMainIndex, mainTileMap.length - 1)]);
+
+      tiles.forEach((tile, index) => {
+        const div = document.createElement("div");
+        div.className = "tile";
+
+        if (tile.type === "main") div.classList.add("path");
+        if (tile.type === "detour") div.classList.add("detour");
+        if (tile.type === "goal") div.classList.add("goal");
+
+        // Bereits geschaffte Hauptfelder markieren
+        const completedMainTiles = [1,2,3,5,6,8,9,10];
+        completedMainTiles.forEach((tileIndex, i) => {
+          if (!inDetour && currentMainIndex > i && index === tileIndex) {
+            div.classList.add("done");
+          }
+          if (finished && index === tileIndex) {
+            div.classList.add("done");
+          }
+        });
+
+        if (index === currentTile) {
+          if (inDetour) {
+            div.classList.add("detour-current");
+          }
+          div.classList.add("current");
+        }
+
+        div.innerHTML = `
+          <div class="tile-icon">${tile.icon}</div>
+          <div class="tile-label">${tile.label}</div>
+        `;
+        labyrinthEl.appendChild(div);
+      });
+
+      scoreEl.textContent = score;
+      mainProgressEl.textContent = finished ? mainQuestions.length : currentMainIndex;
+      detourCountEl.textContent = detourCount;
+      mazeStatusEl.textContent = inDetour ? "Umweg" : finished ? "Ziel erreicht" : "Hauptweg";
+    }
+
+    function setFeedback(type, html) {
+      feedbackEl.className = "feedback " + type;
+      feedbackEl.innerHTML = html;
+    }
+
+    function getCurrentQuestion() {
+      if (finished) return null;
+      if (inDetour) return detourQuestions[currentMainIndex];
+      return mainQuestions[currentMainIndex];
+    }
+
+    function renderQuestion() {
+      renderLabyrinth();
+
+      if (finished) {
+        questionTypeEl.textContent = "Abschluss";
+        levelInfoEl.textContent = "Matura-Ziel";
+        stepInfoEl.textContent = "Ziel";
+        questionTextEl.innerHTML = `
+          <div class="finish">
+            <h2>🏁 Ziel erreicht!</h2>
+            <div class="score-big">Du hast <strong>${score}</strong> von <strong>${mainQuestions.length}</strong> Hauptfragen direkt richtig gelöst.</div>
+            <div class="small">Zusätzlich hast du <strong>${detourCount}</strong> Umweg(e) bewältigt. Sehr stark für die Maturavorbereitung.</div>
+          </div>
+        `;
+        answersEl.innerHTML = "";
+        setFeedback("correct", "🎉 Du hast das Lernlabyrinth vollständig durchgearbeitet.");
+        restartBtn.style.display = "inline-block";
+        playGoalSound();
+        return;
+      }
+
+      const q = getCurrentQuestion();
+      questionTypeEl.textContent = inDetour ? "Umwegfrage" : "Hauptfrage";
+      levelInfoEl.textContent = inDetour ? "Leichter Kontrollschritt" : "Level: " + q.level;
+      stepInfoEl.textContent = inDetour ? "Umweg" : "Feld " + (currentMainIndex + 1);
+
+      questionTextEl.textContent = q.q;
+      answersEl.innerHTML = "";
+      q.a.forEach((answer, i) => {
+        const btn = document.createElement("button");
+        btn.className = "answer-btn";
+        btn.textContent = answer;
+        btn.onclick = () => handleAnswer(i);
+        answersEl.appendChild(btn);
+      });
+
+      if (!inDetour) {
+        setFeedback("info", "Wähle die beste Antwort. Bei einem Fehler landest du zuerst auf einem Umweg.");
+      } else {
+        setFeedback("info", "Du bist im Umweg gelandet. Löse diese leichtere Frage, um wieder auf den Hauptweg zurückzukehren.");
+      }
+    }
+
+    function shakeQuestionBox() {
+      questionBoxEl.classList.remove("shake");
+      void questionBoxEl.offsetWidth;
+      questionBoxEl.classList.add("shake");
+    }
+
+    function handleAnswer(answerIndex) {
+      if (finished) return;
+
+      // AudioContext evtl. erst nach Nutzerinteraktion freigeben
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+
+      const q = getCurrentQuestion();
+
+      if (answerIndex === q.correct) {
+        playCorrectSound();
+
+        if (inDetour) {
+          detourCount++;
+          inDetour = false;
+          currentMainIndex++;
+          setFeedback("correct", `😊 <strong>Richtig!</strong> ${q.explanation}<br>Du verlässt den Umweg und gehst ein Feld weiter.`);
+        } else {
+          score++;
+          currentMainIndex++;
+          setFeedback("correct", `😊 <strong>Richtig!</strong> ${q.explanation}<br>Du gehst im Labyrinth ein Feld weiter.`);
+        }
+
+        if (currentMainIndex >= mainQuestions.length) {
+          finished = true;
+        }
+
+        setTimeout(renderQuestion, 6000);
+      } else {
+        playWrongSound();
+        shakeQuestionBox();
+
+        if (!inDetour) {
+          inDetour = true;
+          setFeedback("wrong", `❌ <strong>Falsch.</strong> ${q.explanation}<br>Du hast eine Sackgasse erwischt und musst erst einen Umweg lösen.`);
+          setTimeout(renderQuestion, 6000);
+        } else {
+          setFeedback("wrong", `❌ <strong>Noch nicht richtig.</strong> ${q.explanation}<br>Du bleibst im Umweg. Versuch die leichtere Kontrollfrage nochmal.`);
+        }
+      }
+    }
+
+    restartBtn.addEventListener("click", () => {
+      currentMainIndex = 0;
+      score = 0;
+      detourCount = 0;
+      inDetour = false;
+      finished = false;
+      restartBtn.style.display = "none";
+      renderQuestion();
+    });
+
+    renderQuestion();
+  </script>
+</body>
+</html>
